@@ -1,7 +1,8 @@
-module Main exposing (main)
+module Main exposing (main, terrainVertices)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
+import List.Extra as List
 import Math.Matrix4 as Mat4 exposing (Mat4)
 import Math.Vector3 as Vec3 exposing (Vec3)
 import WebGL as GL exposing (Mesh, Shader)
@@ -90,6 +91,20 @@ makeFlatTerrainMesh =
             [ ( 1, 0, 2 ), ( 1, 2, 3 ) ]
     in
     GL.indexedTriangles vertices indices
+
+
+terrainVertices : Int -> Int -> List Vertex
+terrainVertices rows cols =
+    List.initialize (rows * cols) <|
+        \vertice ->
+            let
+                z =
+                    vertice // cols
+
+                x =
+                    vertice % cols
+            in
+            { position = Vec3.vec3 (toFloat x) 0 (toFloat z) }
 
 
 terrainVertex : Shader Vertex { uniforms | perspective : Mat4, view : Mat4 } {}
