@@ -1,4 +1,4 @@
-module Main exposing (main, terrainVertices)
+module Main exposing (main)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -29,7 +29,7 @@ type alias Vertex =
 init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 0.1 500
-      , view = Mat4.makeLookAt (Vec3.vec3 0 1 0) (Vec3.vec3 1 0 1) (Vec3.vec3 0 1 0)
+      , view = Mat4.makeLookAt (Vec3.vec3 -30 20 -30) (Vec3.vec3 1 0 1) (Vec3.vec3 0 1 0)
       , flatTerrainMesh = makeFlatTerrainMesh
       }
     , Cmd.none
@@ -81,20 +81,17 @@ makeFlatTerrainMesh : Mesh Vertex
 makeFlatTerrainMesh =
     let
         vertices =
-            [ { position = Vec3.vec3 0 0 0 }
-            , { position = Vec3.vec3 1 0 0 }
-            , { position = Vec3.vec3 0 0 1 }
-            , { position = Vec3.vec3 1 0 1 }
-            ]
+            terrainVertices 65 65
 
         indices =
-            [ ( 1, 0, 2 ), ( 1, 2, 3 ) ]
+            terrainIndices 65 65
     in
     GL.indexedTriangles vertices indices
 
 
 terrainVertices : Int -> Int -> List Vertex
 terrainVertices rows cols =
+    -- Rows and cols are in vertices.
     List.initialize (rows * cols) <|
         \vertice ->
             let
@@ -105,6 +102,47 @@ terrainVertices rows cols =
                     vertice % cols
             in
             { position = Vec3.vec3 (toFloat x) 0 (toFloat z) }
+
+
+terrainIndices : Int -> Int -> List ( Int, Int, Int )
+terrainIndices rows cols =
+    -- Rows and cols are in vertices
+    List.initialize ((rows - 1) * (cols - 1) * 2) <|
+        \triangle ->
+            let
+                quad =
+                    triangle // 2
+
+                half =
+                    triangle % 2
+
+                row =
+                    quad // (rows - 1)
+
+                col =
+                    quad % (cols - 1)
+
+                v0 =
+                    col + (row * cols)
+
+                v1 =
+                    v0 + 1
+
+                v2 =
+                    col + ((row + 1) * cols)
+
+                v3 =
+                    v2 + 1
+            in
+            if isEven half then
+                ( v1, v0, v2 )
+            else
+                ( v1, v2, v3 )
+
+
+isEven : Int -> Bool
+isEven n =
+    n % 2 == 0
 
 
 terrainVertex : Shader Vertex { uniforms | perspective : Mat4, view : Mat4 } {}
