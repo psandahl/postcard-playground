@@ -28,8 +28,8 @@ type alias Vertex =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 0.1 500
-      , view = Mat4.makeLookAt (Vec3.vec3 -30 20 -30) (Vec3.vec3 1 0 1) (Vec3.vec3 0 1 0)
+    ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
+      , view = Mat4.makeLookAt (Vec3.vec3 256 120 -450) (Vec3.vec3 256 5 200) (Vec3.vec3 0 1 0)
       , flatTerrainMesh = makeFlatTerrainMesh
       }
     , Cmd.none
@@ -81,10 +81,10 @@ makeFlatTerrainMesh : Mesh Vertex
 makeFlatTerrainMesh =
     let
         vertices =
-            terrainVertices 65 65
+            terrainVertices 513 513
 
         indices =
-            terrainIndices 65 65
+            terrainIndices 513 513
     in
     GL.indexedTriangles vertices indices
 
@@ -182,6 +182,8 @@ float snoise(vec2 v);
 
 void main()
 {
+    //vec3
+
     vec3 normal = vec3(0.0, 1.0, 0.0);
 
     vColor = vec3(0.3) * (ambientLight() + sunLight(normal));
@@ -203,9 +205,9 @@ vec3 sunLight(vec3 normal)
 
 vec3 adjustHeight(vec3 pos)
 {
-    float dividend = 65.0;
+    float dividend = 513.0;
     vec2 inp = vec2(pos.x / dividend, pos.z / dividend);
-    float h = snoise(inp) * 5.0;
+    float h = snoise(inp) * 50.0;
 
     return vec3(pos.x, h, pos.z);
 }
