@@ -29,7 +29,7 @@ type alias Vertex =
 init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
-      , view = Mat4.makeLookAt (Vec3.vec3 256 120 -450) (Vec3.vec3 256 5 200) (Vec3.vec3 0 1 0)
+      , view = Mat4.makeLookAt (Vec3.vec3 128 64 -128) (Vec3.vec3 128 5 128) (Vec3.vec3 0 1 0)
       , flatTerrainMesh = makeFlatTerrainMesh
       }
     , Cmd.none
@@ -69,22 +69,22 @@ view model =
 
 width : Int
 width =
-    800
+    1024
 
 
 height : Int
 height =
-    600
+    768
 
 
 makeFlatTerrainMesh : Mesh Vertex
 makeFlatTerrainMesh =
     let
         vertices =
-            terrainVertices 513 513
+            terrainVertices 256 256
 
         indices =
-            terrainIndices 513 513
+            terrainIndices 256 256
     in
     GL.indexedTriangles vertices indices
 
@@ -182,14 +182,27 @@ float snoise(vec2 v);
 
 void main()
 {
-    //vec3
+    vec3 v0 = adjustHeight(position + vec3(0.0, 0.0, -1.0));
+    vec3 v1 = adjustHeight(position + vec3(1.0, 0.0, -1.0));
+    vec3 v2 = adjustHeight(position + vec3(-1.0, 0.0, 0.0));
+    vec3 mid = adjustHeight(position);
+    vec3 v3 = adjustHeight(position + vec3(1.0, 0.0, 0.0));
+    vec3 v4 = adjustHeight(position + vec3(-1.0, 0.0, 1.0));
+    vec3 v5 = adjustHeight(position + vec3(0.0, 0.0, 1.0));
 
-    vec3 normal = vec3(0.0, 1.0, 0.0);
+    vec3 norm1 = normalize(cross(v0 - v2, v0 - mid));
+    vec3 norm2 = normalize(cross(v1 - v0, v1 - mid));
+    vec3 norm3 = normalize(cross(v1 - mid, v1 - v3));
+    vec3 norm4 = normalize(cross(mid - v2, mid - v4));
+    vec3 norm5 = normalize(cross(mid - v4, mid - v5));
+    vec3 norm6 = normalize(cross(v3 - mid, v3 - v5));
+
+    vec3 normal = normalize(norm1 + norm2 + norm3 + norm4 + norm5 + norm6);
 
     vColor = vec3(0.3) * (ambientLight() + sunLight(normal));
 
     mat4 mvp = perspective * view;
-    gl_Position = mvp * vec4(adjustHeight(position), 1.0);
+    gl_Position = mvp * vec4(mid, 1.0);
 }
 
 vec3 ambientLight()
@@ -205,11 +218,24 @@ vec3 sunLight(vec3 normal)
 
 vec3 adjustHeight(vec3 pos)
 {
-    float dividend = 513.0;
-    vec2 inp = vec2(pos.x / dividend, pos.z / dividend);
-    float h = snoise(inp) * 50.0;
+    float dividend = 256.0;
+    vec2 inp = vec2(pos.x / dividend, pos.z / dividend) * 2.0;
+    float h = snoise(inp) * 20.0;
 
     return vec3(pos.x, h, pos.z);
+
+    /*float h;
+    if (pos.x < 15.0) {
+        h = 30.0;
+    } else if (pos.x < 30.0) {
+        h = 20.0;
+    } else if (pos.x < 45.0) {
+        h = 10.0;
+    } else {
+        h = 0.0;
+    }
+
+    return vec3(pos.x, h, pos.z);*/
 }
 
 //
