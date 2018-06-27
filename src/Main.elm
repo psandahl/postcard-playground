@@ -163,13 +163,37 @@ uniform mat4 view;
 
 varying vec3 vColor;
 
+vec3 ambientLightColor = vec3(1.0);
+float ambientLightStrength = 0.2;
+
+//vec3 sunLightColor = vec3(182.0 / 255.0, 126.0 / 255.0, 91.0 / 255.0);
+vec3 sunLightColor = vec3(1.0);
+vec3 sunDirection = normalize(vec3(1.0, 1.0, 0.0));
+
+vec3 ambientLight();
+vec3 sunLight(vec3 normal);
+
 void main()
 {
-    vColor = vec3(0.3);
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+
+    vColor = vec3(0.3) * (ambientLight() + sunLight(normal));
 
     mat4 mvp = perspective * view;
     gl_Position = mvp * vec4(position, 1.0);
 }
+
+vec3 ambientLight()
+{
+    return ambientLightColor * ambientLightStrength;
+}
+
+vec3 sunLight(vec3 normal)
+{
+    float diffuse = max(dot(normal, sunDirection), 0.0);
+    return sunLightColor * diffuse;
+}
+
     |]
 
 
@@ -184,6 +208,7 @@ void main()
 {
     gl_FragColor = vec4(vColor, 1.0);
 }
+
     |]
 
 
