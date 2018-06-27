@@ -58,8 +58,8 @@ view model =
             [ DepthTest.default
             , Settings.cullFace Settings.back
             ]
-            terrainVertex
-            terrainFragment
+            terrainVertexShader
+            terrainFragmentShader
             model.flatTerrainMesh
             { perspective = model.perspective
             , view = model.view
@@ -145,8 +145,14 @@ isEven n =
     n % 2 == 0
 
 
-terrainVertex : Shader Vertex { uniforms | perspective : Mat4, view : Mat4 } {}
-terrainVertex =
+terrainVertexShader :
+    Shader Vertex
+        { uniforms
+            | perspective : Mat4
+            , view : Mat4
+        }
+        { vColor : Vec3 }
+terrainVertexShader =
     [glsl|
 precision mediump float;
 
@@ -155,22 +161,28 @@ attribute vec3 position;
 uniform mat4 perspective;
 uniform mat4 view;
 
+varying vec3 vColor;
+
 void main()
 {
+    vColor = vec3(0.3);
+
     mat4 mvp = perspective * view;
     gl_Position = mvp * vec4(position, 1.0);
 }
     |]
 
 
-terrainFragment : Shader {} uniforms {}
-terrainFragment =
+terrainFragmentShader : Shader {} uniforms { vColor : Vec3 }
+terrainFragmentShader =
     [glsl|
 precision mediump float;
 
+varying vec3 vColor;
+
 void main()
 {
-    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+    gl_FragColor = vec4(vColor, 1.0);
 }
     |]
 
