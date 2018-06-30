@@ -40,7 +40,7 @@ type alias Vertex =
 init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
-      , view = Mat4.makeLookAt (Vec3.vec3 0 150 0) (Vec3.vec3 0 5 -600) (Vec3.vec3 0 1 0)
+      , view = Mat4.makeLookAt (Vec3.vec3 0 250 0) (Vec3.vec3 0 5 -600) (Vec3.vec3 0 1 0)
       , tileMatrices = tileMatrices
       , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
@@ -85,12 +85,14 @@ tileMatrices =
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 5)
 
     -- + 5
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 6)
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 6)
 
     -- + 6
     , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 7)
@@ -141,24 +143,56 @@ tileMatrices =
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 10)
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 10)
     , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 10)
+
+    -- + 10
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 6) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 11)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 11)
     ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    let
-        foo =
-            Debug.log "update" ()
-    in
     case msg of
         DragStart pos ->
             ( { model | dragPosition = Just pos }, Cmd.none )
 
         DragAt pos ->
-            ( { model | dragPosition = Just pos }, Cmd.none )
+            let
+                ( deltaX, deltaY ) =
+                    positionDeltas model.dragPosition pos
+
+                deltaOffset =
+                    Vec2.vec2 (toFloat deltaX) (toFloat deltaY)
+            in
+            ( { model
+                | worldOffset = Vec2.add model.worldOffset deltaOffset
+                , dragPosition = Just pos
+              }
+            , Cmd.none
+            )
 
         DragEnd pos ->
             ( { model | dragPosition = Nothing }, Cmd.none )
+
+
+positionDeltas : Maybe Position -> Position -> ( Int, Int )
+positionDeltas mOldPos pos =
+    case mOldPos of
+        Just oldPos ->
+            ( oldPos.x - pos.x, oldPos.y - pos.y )
+
+        Nothing ->
+            ( 0, 0 )
 
 
 view : Model -> Html Msg
