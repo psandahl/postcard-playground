@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import List.Extra as List
 import Math.Matrix4 as Mat4 exposing (Mat4)
+import Math.Vector2 as Vec2 exposing (Vec2)
 import Math.Vector3 as Vec3 exposing (Vec3)
 import WebGL as GL exposing (Mesh, Shader)
 import WebGL.Settings as Settings
@@ -13,6 +14,7 @@ import WebGL.Settings.DepthTest as DepthTest
 type alias Model =
     { perspective : Mat4
     , view : Mat4
+    , uWorldOffset : Vec2
     , flatTerrainMesh : Mesh Vertex
     }
 
@@ -30,6 +32,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
       , view = Mat4.makeLookAt (Vec3.vec3 128 64 -128) (Vec3.vec3 128 5 128) (Vec3.vec3 0 1 0)
+      , uWorldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
       }
     , Cmd.none
@@ -63,6 +66,7 @@ view model =
             model.flatTerrainMesh
             { perspective = model.perspective
             , view = model.view
+            , uWorldOffset = model.uWorldOffset
             }
         ]
 
@@ -150,6 +154,7 @@ terrainVertexShader :
         { uniforms
             | perspective : Mat4
             , view : Mat4
+            , uWorldOffset : Vec2
         }
         { vColor : Vec3 }
 terrainVertexShader =
@@ -158,6 +163,7 @@ precision mediump float;
 
 attribute vec3 position;
 
+uniform vec2 uWorldOffset;
 uniform mat4 perspective;
 uniform mat4 view;
 
@@ -173,7 +179,7 @@ vec3 sunDirection = normalize(vec3(1.0, 1.0, 0.0));
 vec3 ambientLight();
 vec3 sunLight(vec3 normal);
 
-vec3 adjustHeight(vec3 pos);
+float generateHeight(vec3 pos);
 
 vec3 mod289(vec3 x);
 vec2 mod289(vec2 x);
@@ -182,27 +188,42 @@ float snoise(vec2 v);
 
 void main()
 {
-    vec3 v0 = adjustHeight(position + vec3(0.0, 0.0, -1.0));
-    vec3 v1 = adjustHeight(position + vec3(1.0, 0.0, -1.0));
-    vec3 v2 = adjustHeight(position + vec3(-1.0, 0.0, 0.0));
-    vec3 mid = adjustHeight(position);
-    vec3 v3 = adjustHeight(position + vec3(1.0, 0.0, 0.0));
-    vec3 v4 = adjustHeight(position + vec3(-1.0, 0.0, 1.0));
-    vec3 v5 = adjustHeight(position + vec3(0.0, 0.0, 1.0));
+    vec3 worldOffset = vec3(uWorldOffset.x, 0.0, uWorldOffset.y);
 
-    vec3 norm1 = normalize(cross(v0 - v2, v0 - mid));
-    vec3 norm2 = normalize(cross(v1 - v0, v1 - mid));
-    vec3 norm3 = normalize(cross(v1 - mid, v1 - v3));
-    vec3 norm4 = normalize(cross(mid - v2, mid - v4));
-    vec3 norm5 = normalize(cross(mid - v4, mid - v5));
-    vec3 norm6 = normalize(cross(v3 - mid, v3 - v5));
+    vec3 v0 = position + vec3(0.0, 0.0, -1.0);
+    v0.y = generateHeight(v0 + worldOffset);
+
+    vec3 v1 = position + vec3(1.0, 0.0, -1.0);
+    v1.y = generateHeight(v1 + worldOffset);
+
+    vec3 v2 = position + vec3(-1.0, 0.0, 0.0);
+    v2.y = generateHeight(v2 + worldOffset);
+
+    vec3 current = position;
+    current.y = generateHeight(position + worldOffset);
+
+    vec3 v3 = position + vec3(1.0, 0.0, 0.0);
+    v3.y = generateHeight(v3 + worldOffset);
+
+    vec3 v4 = position + vec3(-1.0, 0.0, 1.0);
+    v4.y = generateHeight(v4 + worldOffset);
+
+    vec3 v5 = position + vec3(0.0, 0.0, 1.0);
+    v5.y = generateHeight(v5 + worldOffset);
+
+    vec3 norm1 = normalize(cross(v0 - v2, v0 - current));
+    vec3 norm2 = normalize(cross(v1 - v0, v1 - current));
+    vec3 norm3 = normalize(cross(v1 - current, v1 - v3));
+    vec3 norm4 = normalize(cross(current - v2, current - v4));
+    vec3 norm5 = normalize(cross(current - v4, current - v5));
+    vec3 norm6 = normalize(cross(v3 - current, v3 - v5));
 
     vec3 normal = normalize(norm1 + norm2 + norm3 + norm4 + norm5 + norm6);
 
     vColor = vec3(0.3) * (ambientLight() + sunLight(normal));
 
     mat4 mvp = perspective * view;
-    gl_Position = mvp * vec4(mid, 1.0);
+    gl_Position = mvp * vec4(current, 1.0);
 }
 
 vec3 ambientLight()
@@ -216,26 +237,13 @@ vec3 sunLight(vec3 normal)
     return sunLightColor * diffuse;
 }
 
-vec3 adjustHeight(vec3 pos)
+float generateHeight(vec3 pos)
 {
     float dividend = 256.0;
     vec2 inp = vec2(pos.x / dividend, pos.z / dividend) * 2.0;
     float h = snoise(inp) * 20.0;
 
-    return vec3(pos.x, h, pos.z);
-
-    /*float h;
-    if (pos.x < 15.0) {
-        h = 30.0;
-    } else if (pos.x < 30.0) {
-        h = 20.0;
-    } else if (pos.x < 45.0) {
-        h = 10.0;
-    } else {
-        h = 0.0;
-    }
-
-    return vec3(pos.x, h, pos.z);*/
+    return h;
 }
 
 //
