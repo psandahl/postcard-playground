@@ -50,27 +50,37 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    GL.toHtmlWith
-        [ GL.antialias
-        , GL.depth 1
-        , GL.alpha False
-        , GL.clearColor 0 0 (45 / 255) 1
+    Html.div
+        []
+        [ renderTerrain model
         ]
-        [ Attr.height height
-        , Attr.width width
-        ]
-        [ GL.entityWith
-            [ DepthTest.default
-            , Settings.cullFace Settings.back
+
+
+renderTerrain : Model -> Html Msg
+renderTerrain model =
+    Html.div []
+        [ GL.toHtmlWith
+            [ GL.antialias
+            , GL.depth 1
+            , GL.alpha False
+            , GL.clearColor 0 0 (45 / 255) 1
             ]
-            terrainVertexShader
-            terrainFragmentShader
-            model.flatTerrainMesh
-            { uPerspective = model.perspective
-            , uView = model.view
-            , uWorld = model.world
-            , uWorldOffset = model.worldOffset
-            }
+            [ Attr.height height
+            , Attr.width width
+            ]
+            [ GL.entityWith
+                [ DepthTest.default
+                , Settings.cullFace Settings.back
+                ]
+                terrainVertexShader
+                terrainFragmentShader
+                model.flatTerrainMesh
+                { uPerspective = model.perspective
+                , uView = model.view
+                , uWorld = model.world
+                , uWorldOffset = model.worldOffset
+                }
+            ]
         ]
 
 
