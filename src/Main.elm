@@ -1,11 +1,16 @@
 module Main exposing (main)
 
+import Array
+import Debug
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Events as Events
+import Json.Decode as Decode
 import List.Extra as List
 import Math.Matrix4 as Mat4 exposing (Mat4)
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Math.Vector3 as Vec3 exposing (Vec3)
+import Mouse exposing (Position)
 import WebGL as GL exposing (Mesh, Shader)
 import WebGL.Settings as Settings
 import WebGL.Settings.DepthTest as DepthTest
@@ -14,14 +19,17 @@ import WebGL.Settings.DepthTest as DepthTest
 type alias Model =
     { perspective : Mat4
     , view : Mat4
-    , tiles : List Mat4
+    , tileMatrices : List Mat4
     , worldOffset : Vec2
     , flatTerrainMesh : Mesh Vertex
+    , dragPosition : Maybe Position
     }
 
 
 type Msg
-    = Nop
+    = DragStart Position
+    | DragAt Position
+    | DragEnd Position
 
 
 type alias Vertex =
@@ -32,25 +40,125 @@ type alias Vertex =
 init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
-      , view = Mat4.makeLookAt (Vec3.vec3 0 150 0) (Vec3.vec3 0 5 -256) (Vec3.vec3 0 1 0)
-      , tiles =
-            [ Mat4.makeTranslate3 -(toFloat tileSize - 1) 0 -(toFloat tileSize)
-            , Mat4.makeTranslate3 0 0 -(toFloat tileSize)
-            , Mat4.makeTranslate3 -(toFloat tileSize - 1) 0 -(toFloat (2 * tileSize - 1) - 1)
-            , Mat4.makeTranslate3 0 0 -(toFloat (2 * tileSize) - 1)
-            ]
+      , view = Mat4.makeLookAt (Vec3.vec3 0 150 0) (Vec3.vec3 0 5 -600) (Vec3.vec3 0 1 0)
+      , tileMatrices = tileMatrices
       , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
+      , dragPosition = Nothing
       }
     , Cmd.none
     )
 
 
+tileMatrices : List Mat4
+tileMatrices =
+    [ -- Closest row
+      Mat4.makeTranslate3 -(tileSizeFloat - 1) 0 -tileSizeFloat
+    , Mat4.makeTranslate3 0 0 -tileSizeFloat
+
+    -- + 1
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 2)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 2)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 2)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 2)
+
+    -- + 2
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 3)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 3)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 3)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 3)
+
+    -- + 3
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 4)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 4)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 4)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 4)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 4)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 4)
+
+    -- + 4
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 5)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 5)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 5)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 5)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 5)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 5)
+
+    -- + 5
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 6)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 6)
+
+    -- + 6
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 7)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 7)
+
+    -- + 7
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 8)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 8)
+
+    -- + 8
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 6) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 9)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 9)
+
+    -- + 9
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 6) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 -((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 0 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 1) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 2) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 3) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 4) 0 -((tileSizeFloat - 1) * 10)
+    , Mat4.makeTranslate3 ((tileSizeFloat - 1) * 5) 0 -((tileSizeFloat - 1) * 10)
+    ]
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        foo =
+            Debug.log "update" ()
+    in
     case msg of
-        Nop ->
-            ( model, Cmd.none )
+        DragStart pos ->
+            ( { model | dragPosition = Just pos }, Cmd.none )
+
+        DragAt pos ->
+            ( { model | dragPosition = Just pos }, Cmd.none )
+
+        DragEnd pos ->
+            ( { model | dragPosition = Nothing }, Cmd.none )
 
 
 view : Model -> Html Msg
@@ -61,9 +169,31 @@ view model =
         ]
 
 
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    case model.dragPosition of
+        Nothing ->
+            Sub.none
+
+        Just _ ->
+            Sub.batch [ Mouse.moves DragAt, Mouse.ups DragEnd ]
+
+
 renderTerrain : Model -> Html Msg
 renderTerrain model =
-    Html.div []
+    Html.div
+        [ onMouseDown
+        , Attr.style
+            [ ( "cursor"
+              , case model.dragPosition of
+                    Nothing ->
+                        "default"
+
+                    Just _ ->
+                        "move"
+              )
+            ]
+        ]
         [ GL.toHtmlWith
             [ GL.antialias
             , GL.depth 1
@@ -89,8 +219,13 @@ renderTerrain model =
                         , uWorldOffset = model.worldOffset
                         }
                 )
-                model.tiles
+                model.tileMatrices
         ]
+
+
+onMouseDown : Html.Attribute Msg
+onMouseDown =
+    Events.on "mousedown" (Decode.map DragStart Mouse.position)
 
 
 width : Int
@@ -105,7 +240,12 @@ height =
 
 tileSize : Int
 tileSize =
-    256
+    65
+
+
+tileSizeFloat : Float
+tileSizeFloat =
+    toFloat tileSize
 
 
 makeFlatTerrainMesh : Mesh Vertex
@@ -372,5 +512,5 @@ main =
         { init = init
         , update = update
         , view = view
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         }
