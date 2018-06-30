@@ -14,7 +14,7 @@ import WebGL.Settings.DepthTest as DepthTest
 type alias Model =
     { perspective : Mat4
     , view : Mat4
-    , world : Mat4
+    , tiles : List Mat4
     , worldOffset : Vec2
     , flatTerrainMesh : Mesh Vertex
     }
@@ -32,8 +32,13 @@ type alias Vertex =
 init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
-      , view = Mat4.makeLookAt (Vec3.vec3 128 64 -128) (Vec3.vec3 128 5 128) (Vec3.vec3 0 1 0)
-      , world = Mat4.makeTranslate3 0 0 0
+      , view = Mat4.makeLookAt (Vec3.vec3 0 150 0) (Vec3.vec3 0 5 -256) (Vec3.vec3 0 1 0)
+      , tiles =
+            [ Mat4.makeTranslate3 -(toFloat tileSize - 1) 0 -(toFloat tileSize)
+            , Mat4.makeTranslate3 0 0 -(toFloat tileSize)
+            , Mat4.makeTranslate3 -(toFloat tileSize - 1) 0 -(toFloat (2 * tileSize - 1) - 1)
+            , Mat4.makeTranslate3 0 0 -(toFloat (2 * tileSize) - 1)
+            ]
       , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
       }
@@ -68,19 +73,23 @@ renderTerrain model =
             [ Attr.height height
             , Attr.width width
             ]
-            [ GL.entityWith
-                [ DepthTest.default
-                , Settings.cullFace Settings.back
-                ]
-                terrainVertexShader
-                terrainFragmentShader
-                model.flatTerrainMesh
-                { uPerspective = model.perspective
-                , uView = model.view
-                , uWorld = model.world
-                , uWorldOffset = model.worldOffset
-                }
-            ]
+          <|
+            List.map
+                (\tileMatrix ->
+                    GL.entityWith
+                        [ DepthTest.default
+                        , Settings.cullFace Settings.back
+                        ]
+                        terrainVertexShader
+                        terrainFragmentShader
+                        model.flatTerrainMesh
+                        { uPerspective = model.perspective
+                        , uView = model.view
+                        , uWorld = tileMatrix
+                        , uWorldOffset = model.worldOffset
+                        }
+                )
+                model.tiles
         ]
 
 
@@ -94,14 +103,19 @@ height =
     768
 
 
+tileSize : Int
+tileSize =
+    256
+
+
 makeFlatTerrainMesh : Mesh Vertex
 makeFlatTerrainMesh =
     let
         vertices =
-            terrainVertices 256 256
+            terrainVertices tileSize tileSize
 
         indices =
-            terrainIndices 256 256
+            terrainIndices tileSize tileSize
     in
     GL.indexedTriangles vertices indices
 
