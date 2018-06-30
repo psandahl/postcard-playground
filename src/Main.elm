@@ -14,7 +14,8 @@ import WebGL.Settings.DepthTest as DepthTest
 type alias Model =
     { perspective : Mat4
     , view : Mat4
-    , uWorldOffset : Vec2
+    , world : Mat4
+    , worldOffset : Vec2
     , flatTerrainMesh : Mesh Vertex
     }
 
@@ -24,7 +25,7 @@ type Msg
 
 
 type alias Vertex =
-    { position : Vec3
+    { aPosition : Vec3
     }
 
 
@@ -32,7 +33,8 @@ init : ( Model, Cmd Msg )
 init =
     ( { perspective = Mat4.makePerspective 45 (toFloat width / toFloat height) 1.0 1100
       , view = Mat4.makeLookAt (Vec3.vec3 128 64 -128) (Vec3.vec3 128 5 128) (Vec3.vec3 0 1 0)
-      , uWorldOffset = Vec2.vec2 0 0
+      , world = Mat4.makeTranslate3 0 0 0
+      , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
       }
     , Cmd.none
@@ -64,9 +66,10 @@ view model =
             terrainVertexShader
             terrainFragmentShader
             model.flatTerrainMesh
-            { perspective = model.perspective
-            , view = model.view
-            , uWorldOffset = model.uWorldOffset
+            { uPerspective = model.perspective
+            , uView = model.view
+            , uWorld = model.world
+            , uWorldOffset = model.worldOffset
             }
         ]
 
@@ -105,7 +108,7 @@ terrainVertices rows cols =
                 x =
                     vertice % cols
             in
-            { position = Vec3.vec3 (toFloat x) 0 (toFloat z) }
+            { aPosition = Vec3.vec3 (toFloat x) 0 (toFloat z) }
 
 
 terrainIndices : Int -> Int -> List ( Int, Int, Int )
@@ -152,8 +155,9 @@ isEven n =
 terrainVertexShader :
     Shader Vertex
         { uniforms
-            | perspective : Mat4
-            , view : Mat4
+            | uPerspective : Mat4
+            , uView : Mat4
+            , uWorld : Mat4
             , uWorldOffset : Vec2
         }
         { vColor : Vec3 }
@@ -161,11 +165,12 @@ terrainVertexShader =
     [glsl|
 precision mediump float;
 
-attribute vec3 position;
+attribute vec3 aPosition;
 
 uniform vec2 uWorldOffset;
-uniform mat4 perspective;
-uniform mat4 view;
+uniform mat4 uPerspective;
+uniform mat4 uView;
+uniform mat4 uWorld;
 
 varying vec3 vColor;
 
@@ -188,6 +193,8 @@ float snoise(vec2 v);
 
 void main()
 {
+    vec3 position = (uWorld * vec4(aPosition, 1.0)).xyz;
+
     vec3 worldOffset = vec3(uWorldOffset.x, 0.0, uWorldOffset.y);
 
     vec3 v0 = position + vec3(0.0, 0.0, -1.0);
@@ -222,8 +229,7 @@ void main()
 
     vColor = vec3(0.3) * (ambientLight() + sunLight(normal));
 
-    mat4 mvp = perspective * view;
-    gl_Position = mvp * vec4(current, 1.0);
+    gl_Position = uPerspective * uView * vec4(current, 1.0);
 }
 
 vec3 ambientLight()
