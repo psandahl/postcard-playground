@@ -200,6 +200,7 @@ view model =
     Html.div
         []
         [ renderTerrain model
+        , renderTools model
         ]
 
 
@@ -211,6 +212,28 @@ subscriptions model =
 
         Just _ ->
             Sub.batch [ Mouse.moves DragAt, Mouse.ups DragEnd ]
+
+
+renderTools : Model -> Html Msg
+renderTools model =
+    Html.div
+        []
+        [ renderSlider "Base Wave Length" 1024 1 4096
+        ]
+
+
+renderSlider : String -> Int -> Int -> Int -> Html Msg
+renderSlider caption value min_ max_ =
+    Html.div []
+        [ Html.text caption
+        , Html.input
+            [ Attr.type_ "range"
+            , Attr.value (toString value)
+            , Attr.min (toString min_)
+            , Attr.max (toString max_)
+            ]
+            []
+        ]
 
 
 renderTerrain : Model -> Html Msg
