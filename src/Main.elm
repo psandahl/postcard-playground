@@ -25,6 +25,8 @@ type alias Model =
     , dragPosition : Maybe Position
     , freq1Length : Int
     , freq1Altitude : Int
+    , freq2Length : Int
+    , freq2Altitude : Int
     }
 
 
@@ -38,6 +40,8 @@ type Msg
 type Slider
     = Freq1Length
     | Freq1Altitude
+    | Freq2Length
+    | Freq2Altitude
 
 
 type alias Vertex =
@@ -53,8 +57,10 @@ init =
       , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
       , dragPosition = Nothing
-      , freq1Length = 256
-      , freq1Altitude = 30
+      , freq1Length = 512
+      , freq1Altitude = 0
+      , freq2Length = 256
+      , freq2Altitude = 0
       }
     , Cmd.none
     )
@@ -202,6 +208,12 @@ update msg model =
                 Freq1Altitude ->
                     ( { model | freq1Altitude = value }, Cmd.none )
 
+                Freq2Length ->
+                    ( { model | freq2Length = value }, Cmd.none )
+
+                Freq2Altitude ->
+                    ( { model | freq2Altitude = value }, Cmd.none )
+
 
 positionDeltas : Maybe Position -> Position -> ( Int, Int )
 positionDeltas mOldPos pos =
@@ -238,6 +250,8 @@ renderTools model =
         []
         [ renderSlider Freq1Length "Freq 1 Wave Length" model.freq1Length 1 4096
         , renderSlider Freq1Altitude "Freq 1 Altitude" model.freq1Altitude 0 100
+        , renderSlider Freq2Length "Freq 2 Length" model.freq2Length 1 4096
+        , renderSlider Freq2Altitude "Freq 2 Altitude" model.freq2Altitude 0 100
         ]
 
 
@@ -295,6 +309,8 @@ renderTerrain model =
                         , uWorld = tileMatrix
                         , uFreq1Length = model.freq1Length
                         , uFreq1Altitude = model.freq1Altitude
+                        , uFreq2Length = model.freq2Length
+                        , uFreq2Altitude = model.freq2Altitude
                         , uWorldOffset = model.worldOffset
                         }
                 )
@@ -408,6 +424,8 @@ terrainVertexShader :
             , uWorld : Mat4
             , uFreq1Length : Int
             , uFreq1Altitude : Int
+            , uFreq2Length : Int
+            , uFreq2Altitude : Int
             , uWorldOffset : Vec2
         }
         { vColor : Vec3 }
@@ -419,6 +437,8 @@ attribute vec3 aPosition;
 
 uniform int uFreq1Length;
 uniform int uFreq1Altitude;
+uniform int uFreq2Length;
+uniform int uFreq2Altitude;
 uniform vec2 uWorldOffset;
 uniform mat4 uPerspective;
 uniform mat4 uView;
@@ -497,11 +517,15 @@ vec3 sunLight(vec3 normal)
 
 float generateHeight(vec3 pos)
 {
-    float dividend = float(uFreq1Length);
-    vec2 inp = vec2(pos.x / dividend, pos.z / dividend);
-    float h = snoise(inp) * float(uFreq1Altitude);
+    float dividend1 = float(uFreq1Length);
+    vec2 inp1 = vec2(pos.x / dividend1, pos.z / dividend1);
+    float h1 = snoise(inp1) * float(uFreq1Altitude);
 
-    return h;
+    float dividend2 = float(uFreq2Length);
+    vec2 inp2 = vec2(pos.x / dividend2, pos.z / dividend2);
+    float h2 = snoise(inp2) * float(uFreq2Altitude);
+
+    return h1 + h2;
 }
 
 //
