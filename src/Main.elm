@@ -24,6 +24,7 @@ type alias Model =
     , flatTerrainMesh : Mesh Vertex
     , dragPosition : Maybe Position
     , freq1Length : Int
+    , freq1Altitude : Int
     }
 
 
@@ -31,7 +32,12 @@ type Msg
     = DragStart Position
     | DragAt Position
     | DragEnd Position
-    | SetSlider Int
+    | SetSlider Slider Int
+
+
+type Slider
+    = Freq1Length
+    | Freq1Altitude
 
 
 type alias Vertex =
@@ -48,6 +54,7 @@ init =
       , flatTerrainMesh = makeFlatTerrainMesh
       , dragPosition = Nothing
       , freq1Length = 256
+      , freq1Altitude = 30
       }
     , Cmd.none
     )
@@ -187,8 +194,13 @@ update msg model =
         DragEnd pos ->
             ( { model | dragPosition = Nothing }, Cmd.none )
 
-        SetSlider value ->
-            ( { model | freq1Length = value }, Cmd.none )
+        SetSlider slider value ->
+            case slider of
+                Freq1Length ->
+                    ( { model | freq1Length = value }, Cmd.none )
+
+                Freq1Altitude ->
+                    ( { model | freq1Altitude = value }, Cmd.none )
 
 
 positionDeltas : Maybe Position -> Position -> ( Int, Int )
@@ -224,12 +236,13 @@ renderTools : Model -> Html Msg
 renderTools model =
     Html.div
         []
-        [ renderSlider "Freq 1 Wave Length" model.freq1Length 1 4096
+        [ renderSlider Freq1Length "Freq 1 Wave Length" model.freq1Length 1 4096
+        , renderSlider Freq1Altitude "Freq 1 Altitude" model.freq1Altitude 0 100
         ]
 
 
-renderSlider : String -> Int -> Int -> Int -> Html Msg
-renderSlider caption value min_ max_ =
+renderSlider : Slider -> String -> Int -> Int -> Int -> Html Msg
+renderSlider slider caption value min_ max_ =
     Html.div []
         [ Html.text caption
         , Html.input
@@ -237,7 +250,7 @@ renderSlider caption value min_ max_ =
             , Attr.value (toString value)
             , Attr.min (toString min_)
             , Attr.max (toString max_)
-            , onSetSlider
+            , onSetSlider slider
             ]
             []
         ]
@@ -281,6 +294,7 @@ renderTerrain model =
                         , uView = model.view
                         , uWorld = tileMatrix
                         , uFreq1Length = model.freq1Length
+                        , uFreq1Altitude = model.freq1Altitude
                         , uWorldOffset = model.worldOffset
                         }
                 )
@@ -288,9 +302,9 @@ renderTerrain model =
         ]
 
 
-onSetSlider : Html.Attribute Msg
-onSetSlider =
-    Events.on "input" (Decode.map (\x -> String.toInt x |> Result.withDefault 0 |> SetSlider) Events.targetValue)
+onSetSlider : Slider -> Html.Attribute Msg
+onSetSlider slider =
+    Events.on "input" (Decode.map (\x -> String.toInt x |> Result.withDefault 0 |> SetSlider slider) Events.targetValue)
 
 
 onMouseDown : Html.Attribute Msg
@@ -393,6 +407,7 @@ terrainVertexShader :
             , uView : Mat4
             , uWorld : Mat4
             , uFreq1Length : Int
+            , uFreq1Altitude : Int
             , uWorldOffset : Vec2
         }
         { vColor : Vec3 }
@@ -403,6 +418,7 @@ precision mediump float;
 attribute vec3 aPosition;
 
 uniform int uFreq1Length;
+uniform int uFreq1Altitude;
 uniform vec2 uWorldOffset;
 uniform mat4 uPerspective;
 uniform mat4 uView;
@@ -482,8 +498,8 @@ vec3 sunLight(vec3 normal)
 float generateHeight(vec3 pos)
 {
     float dividend = float(uFreq1Length);
-    vec2 inp = vec2(pos.x / dividend, pos.z / dividend) * 2.0;
-    float h = snoise(inp) * 20.0;
+    vec2 inp = vec2(pos.x / dividend, pos.z / dividend);
+    float h = snoise(inp) * float(uFreq1Altitude);
 
     return h;
 }
