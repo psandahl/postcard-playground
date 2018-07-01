@@ -23,6 +23,7 @@ type alias Model =
     , worldOffset : Vec2
     , flatTerrainMesh : Mesh Vertex
     , dragPosition : Maybe Position
+    , freq1Length : Int
     }
 
 
@@ -30,6 +31,7 @@ type Msg
     = DragStart Position
     | DragAt Position
     | DragEnd Position
+    | SetSlider Int
 
 
 type alias Vertex =
@@ -45,6 +47,7 @@ init =
       , worldOffset = Vec2.vec2 0 0
       , flatTerrainMesh = makeFlatTerrainMesh
       , dragPosition = Nothing
+      , freq1Length = 256
       }
     , Cmd.none
     )
@@ -184,6 +187,9 @@ update msg model =
         DragEnd pos ->
             ( { model | dragPosition = Nothing }, Cmd.none )
 
+        SetSlider value ->
+            ( { model | freq1Length = value }, Cmd.none )
+
 
 positionDeltas : Maybe Position -> Position -> ( Int, Int )
 positionDeltas mOldPos pos =
@@ -218,7 +224,7 @@ renderTools : Model -> Html Msg
 renderTools model =
     Html.div
         []
-        [ renderSlider "Base Wave Length" 1024 1 4096
+        [ renderSlider "Freq 1 Wave Length" model.freq1Length 1 4096
         ]
 
 
@@ -231,6 +237,7 @@ renderSlider caption value min_ max_ =
             , Attr.value (toString value)
             , Attr.min (toString min_)
             , Attr.max (toString max_)
+            , onSetSlider
             ]
             []
         ]
@@ -273,11 +280,17 @@ renderTerrain model =
                         { uPerspective = model.perspective
                         , uView = model.view
                         , uWorld = tileMatrix
+                        , uFreq1Length = model.freq1Length
                         , uWorldOffset = model.worldOffset
                         }
                 )
                 model.tileMatrices
         ]
+
+
+onSetSlider : Html.Attribute Msg
+onSetSlider =
+    Events.on "input" (Decode.map (\x -> String.toInt x |> Result.withDefault 0 |> SetSlider) Events.targetValue)
 
 
 onMouseDown : Html.Attribute Msg
@@ -379,6 +392,7 @@ terrainVertexShader :
             | uPerspective : Mat4
             , uView : Mat4
             , uWorld : Mat4
+            , uFreq1Length : Int
             , uWorldOffset : Vec2
         }
         { vColor : Vec3 }
@@ -388,6 +402,7 @@ precision mediump float;
 
 attribute vec3 aPosition;
 
+uniform int uFreq1Length;
 uniform vec2 uWorldOffset;
 uniform mat4 uPerspective;
 uniform mat4 uView;
@@ -466,7 +481,7 @@ vec3 sunLight(vec3 normal)
 
 float generateHeight(vec3 pos)
 {
-    float dividend = 256.0;
+    float dividend = float(uFreq1Length);
     vec2 inp = vec2(pos.x / dividend, pos.z / dividend) * 2.0;
     float h = snoise(inp) * 20.0;
 
